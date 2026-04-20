@@ -1,0 +1,190 @@
+* {
+    box-sizing: border-box;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.card {
+    background: white;
+    border-radius: 24px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+h1 {
+    font-size: 1.8rem;
+    margin: 0 0 8px 0;
+    color: #0f172a;
+}
+
+.sub {
+    color: #475569;
+    margin-bottom: 24px;
+    border-left: 4px solid #f0b90b;
+    padding-left: 16px;
+}
+
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+    margin-bottom: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 140px;
+}
+
+.input-group label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #475569;
+}
+
+input, select, button {
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #e2e8f0;
+    font-size: 0.9rem;
+    background: white;
+}
+
+button {
+    background: #1a1f36;
+    color: white;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+button:hover {
+    background: #f0b90b;
+    color: #1a1f36;
+}
+
+button:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+.status-bar {
+    background: #f1f5f9;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+
+.status-bar.error {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 12px 20px;
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.recommendation-box {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 20px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.recommendation-box h3 {
+    color: #f0b90b;
+    margin: 0 0 16px 0;
+}
+
+.recommendation-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.rec-item {
+    flex: 1;
+    text-align: center;
+    background: rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 16px;
+}
+
+.rec-label {
+    display: block;
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.rec-value {
+    display: block;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #f0b90b;
+}
+
+.rec-item small {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.legend-note {
+    font-size: 0.75rem;
+    background: #f1f5f9;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-top: 20px;
+    color: #475569;
+}
+
+@media (max-width: 680px) {
+    .form-row { flex-direction: column; }
+    .stat-value { font-size: 1.1rem; }
+    .rec-value { font-size: 1.2rem; }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "app1",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "contracts": "node src/resolver/fetchContracts.js",
+    "tokenlist": "node src/resolver/mexcdextokens.js",
+    "chartdev": "node --watch charts/server.js",
+    "chart": "node charts/server.js"
+  },
+  "keywords": [],
+  "author": "atospartos",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.3.1",
+    "node-telegram-bot-api": "^0.67.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

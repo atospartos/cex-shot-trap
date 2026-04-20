@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEXC/DEX Анализатор просадок</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); margin: 0; padding: 20px; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card { background: white; border-radius: 28px; padding: 28px; margin-bottom: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.6rem; margin: 0 0 8px 0; color: #0f172a; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .sub { color: #475569; margin-bottom: 24px; border-left: 4px solid #f0b90b; padding-left: 16px; font-size: 0.9rem; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+        .input-group label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #475569; }
+        input, select, button { padding: 12px 16px; border-radius: 14px; border: 1.5px solid #e2e8f0; font-size: 0.9rem; background: white; transition: all 0.2s; }
+        button { background: #1a1f36; color: white; font-weight: 600; border: none; cursor: pointer; }
+        button:hover { background: #f0b90b; color: #1a1f36; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        .status-bar { background: #f1f5f9; padding: 12px 16px; border-radius: 14px; margin-bottom: 20px; font-family: monospace; font-size: 0.85rem; }
+        .status-bar.error { background: #fee2e2; color: #dc2626; }
+        .status-bar.warning { background: #fef3c7; color: #d97706; }
+        .status-bar.success { background: #dcfce7; color: #16a34a; }
+        .chart-container { height: 500px; margin-top: 20px; }
+        .stats { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
+        .stat-card { background: #f8fafc; border-radius: 20px; padding: 16px 20px; flex: 1; min-width: 100px; text-align: center; border-left: 4px solid; }
+        .stat-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 1.6rem; font-weight: 700; color: #0f172a; }
+        .recommendation-box { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 24px; padding: 24px; margin-top: 20px; }
+        .recommendation-box h3 { color: #f0b90b; margin: 0 0 20px 0; font-size: 1.2rem; }
+        .recommendation-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+        .rec-item { flex: 1; text-align: center; background: rgba(255,255,255,0.08); border-radius: 20px; padding: 16px; }
+        .rec-label { display: block; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; }
+        .rec-value { display: block; font-size: 1.8rem; font-weight: 700; color: #f0b90b; }
+        .rec-item small { font-size: 0.7rem; color: #64748b; }
+        .token-nav { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .token-select { flex: 2; min-width: 200px; }
+        .token-status { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; background: #f1f5f9; }
+        .token-status.approved { background: #dcfce7; color: #16a34a; }
+        .token-status.rejected { background: #fee2e2; color: #dc2626; }
+        .token-status.pending { background: #fef3c7; color: #d97706; }
+        .legend-note { font-size: 0.75rem; background: #f1f5f9; padding: 12px 16px; border-radius: 14px; margin-top: 20px; color: #475569; }
+        @media (max-width: 680px) { .form-row { flex-direction: column; } .stat-value { font-size: 1.2rem; } .rec-value { font-size: 1.3rem; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>
+            📉 MEXC / DEX Анализатор просадок
+            <span style="font-size: 0.7rem; background: #f0b90b; padding: 2px 10px; border-radius: 40px; color: #0f172a;">лонг-ловушка</span>
+        </h1>
+        <div class="sub">Анализ просадок MEXC относительно DEX (оракул) для стратегии лимитной ловушки</div>
+
+        <!-- Навигация по токенам -->
+        <div class="token-nav">
+            <select id="tokenSelect" class="token-select" style="flex: 2;">
+                <option value="">-- Загрузка списка токенов --</option>
+            </select>
+            <button id="prevTokenBtn" style="background: #475569;">◀ Предыдущий</button>
+            <button id="nextTokenBtn" style="background: #475569;">Следующий ▶</button>
+            <button id="refreshTokensBtn" style="background: #475569;">🔄 Обновить</button>
+            <span id="tokenStatus" class="token-status pending">статус: загрузка</span>
+        </div>
+
+        <div class="form-row">
+            <div class="input-group">
+                <label>📈 Токен (MEXC Symbol)</label>
+                <input type="text" id="symbol" placeholder="BONKUSDT, WIFUSDT, PEPEUSDT">
+            </div>
+            <div class="input-group">
+                <label>🔗 Адрес контракта (DEX Oracle)</label>
+                <input type="text" id="tokenAddress" placeholder="Solana или EVM адрес">
+            </div>
+            <div class="input-group">
+                <label>🌐 Сеть</label>
+                <select id="chainId">
+                    <option value="solana:solana">Solana</option>
+                    <option value="evm:56">BNB Chain</option>
+                    <option value="evm:1">Ethereum</option>
+                    <option value="evm:42161">Arbitrum</option>
+                    <option value="evm:8453">Base</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="input-group">
+                <label>⏱️ Таймфрейм</label>
+                <select id="interval">
+                    <option value="1m">1 минута (макс 2 дня)</option>
+                    <option value="5m" selected>5 минут (макс 10 дней)</option>
+                    <option value="15m">15 минут (макс 20 дней)</option>
+                    <option value="30m">30 минут (макс 20 дней)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>📅 Дней для анализа</label>
+                <input type="number" id="days" value="3" min="1" max="30" step="1">
+            </div>
+            <div class="input-group">
+                <label>🎯 Порог просадки (%)</label>
+                <input type="number" id="drawdownThreshold" value="1.5" step="0.5" min="0.5" max="10">
+            </div>
+            <button id="analyzeBtn">🔍 ЗАГРУЗИТЬ И АНАЛИЗИРОВАТЬ</button>
+        </div>
+
+        <div id="status" class="status-bar">✅ Готов к работе</div>
+
+        <div class="chart-container">
+            <canvas id="spreadChart"></canvas>
+        </div>
+
+        <div id="resultsPanel" style="display: none;">
+            <div class="stats">
+                <div class="stat-card" style="border-left-color: #3b82f6"><div class="stat-label">Винрейт</div><div class="stat-value" id="winrate">—</div></div>
+                <div class="stat-card" style="border-left-color: #8b5cf6"><div class="stat-label">Событий</div><div class="stat-value" id="totalEvents">—</div></div>
+                <div class="stat-card" style="border-left-color: #10b981"><div class="stat-label">Успешных</div><div class="stat-value" id="successfulEvents">—</div></div>
+                <div class="stat-card" style="border-left-color: #06b6d4"><div class="stat-label">Схождение</div><div class="stat-value" id="closingRate">—</div></div>
+                <div class="stat-card" style="border-left-color: #f59e0b"><div class="stat-label">Вердикт</div><div class="stat-value" id="verdict">—</div></div>
+            </div>
+
+            <div class="recommendation-box">
+                <h3>🎯 Рекомендации для лимитной ловушки</h3>
+                <div class="recommendation-grid">
+                    <div class="rec-item"><span class="rec-label">📉 Глубина просадки</span><span class="rec-value" id="recEntry">—</span><small>% (историческая)</small></div>
+                    <div class="rec-item"><span class="rec-label">📈 Тейк-профит</span><span class="rec-value" id="recTP">—</span><small>% от входа</small></div>
+                    <div class="rec-item"><span class="rec-label">⏱️ Max удержание</span><span class="rec-value" id="recMaxHold">—</span><small>часов</small></div>
+                    <div class="rec-item"><span class="rec-label">🎲 Ожидаемый WR</span><span class="rec-value" id="recWinrate">—</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="legend-note">
+            📊 <strong>Как работает:</strong> Анализатор находит моменты, когда MEXC проседает ниже DEX, и проверяет восстановление.<br>
+            🎯 <strong>Результат:</strong> Рекомендации для установки лимитной ловушки. Данные автоматически сохраняются в файл токенов.<br>
+            📈 <strong>Таймфреймы:</strong> 1m (макс 2 дня), 5m (макс 10 дней), 15m/30m (макс 20 дней).
+        </div>
+    </div>
+</div>
+<script src="client.js"></script>
+</body>
+</html>
