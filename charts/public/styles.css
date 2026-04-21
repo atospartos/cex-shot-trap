@@ -11,22 +11,26 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
 }
 
 .card {
     background: white;
-    border-radius: 24px;
+    border-radius: 28px;
     padding: 28px;
     margin-bottom: 24px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     margin: 0 0 8px 0;
     color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .sub {
@@ -34,6 +38,7 @@ h1 {
     margin-bottom: 24px;
     border-left: 4px solid #f0b90b;
     padding-left: 16px;
+    font-size: 0.9rem;
 }
 
 .form-row {
@@ -56,15 +61,17 @@ h1 {
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
     color: #475569;
 }
 
 input, select, button {
     padding: 12px 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     border: 1.5px solid #e2e8f0;
     font-size: 0.9rem;
     background: white;
+    transition: all 0.2s;
 }
 
 button {
@@ -73,7 +80,6 @@ button {
     font-weight: 600;
     border: none;
     cursor: pointer;
-    transition: 0.2s;
 }
 
 button:hover {
@@ -89,10 +95,10 @@ button:disabled {
 .status-bar {
     background: #f1f5f9;
     padding: 12px 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     margin-bottom: 20px;
-    font-size: 0.85rem;
     font-family: monospace;
+    font-size: 0.85rem;
 }
 
 .status-bar.error {
@@ -100,20 +106,68 @@ button:disabled {
     color: #dc2626;
 }
 
+.status-bar.success {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.status-bar.warning {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.chart-container {
+    height: 500px;
+    margin-top: 20px;
+    position: relative;
+}
+
+.chart-container canvas {
+    cursor: grab;
+}
+
+.chart-container canvas:active {
+    cursor: grabbing;
+}
+
+.zoom-controls {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+.zoom-btn {
+    background: #475569;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.zoom-btn:hover {
+    background: #f0b90b;
+    color: #1a1f36;
+}
+
 .stats {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
-    margin-bottom: 24px;
+    margin: 20px 0;
 }
 
 .stat-card {
     background: #f8fafc;
-    border-radius: 16px;
-    padding: 12px 20px;
+    border-radius: 20px;
+    padding: 16px 20px;
     flex: 1;
     min-width: 100px;
     text-align: center;
+    border-left: 4px solid;
 }
 
 .stat-label {
@@ -123,34 +177,34 @@ button:disabled {
 }
 
 .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 700;
     color: #0f172a;
 }
 
 .recommendation-box {
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border-radius: 20px;
-    padding: 20px;
+    border-radius: 24px;
+    padding: 24px;
     margin-top: 20px;
 }
 
 .recommendation-box h3 {
     color: #f0b90b;
-    margin: 0 0 16px 0;
+    margin: 0 0 20px 0;
 }
 
 .recommendation-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 20px;
+    gap: 16px;
 }
 
 .rec-item {
     flex: 1;
     text-align: center;
-    background: rgba(255,255,255,0.1);
-    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
     padding: 16px;
 }
 
@@ -164,27 +218,65 @@ button:disabled {
 
 .rec-value {
     display: block;
-    font-size: 1.6rem;
+    font-size: 1.8rem;
     font-weight: 700;
     color: #f0b90b;
 }
 
-.rec-item small {
-    font-size: 0.7rem;
+.token-select {
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.warnings {
+    background: #fef3c7;
+    color: #d97706;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+}
+
+.sync-info {
+    font-size: 0.75rem;
     color: #64748b;
+    margin-bottom: 16px;
+    text-align: center;
 }
 
 .legend-note {
     font-size: 0.75rem;
     background: #f1f5f9;
     padding: 12px 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     margin-top: 20px;
     color: #475569;
 }
 
+.zoom-instruction {
+    font-size: 0.7rem;
+    color: #64748b;
+    text-align: center;
+    margin-top: 8px;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+}
+
+.zoom-instruction span {
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
 @media (max-width: 680px) {
-    .form-row { flex-direction: column; }
-    .stat-value { font-size: 1.1rem; }
-    .rec-value { font-size: 1.2rem; }
+    .form-row {
+        flex-direction: column;
+    }
+    .stat-value {
+        font-size: 1.2rem;
+    }
+    .rec-value {
+        font-size: 1.3rem;
+    }
 }

@@ -19,19 +19,19 @@
     },
     {
       "symbol": "67",
-      "lastAnalysis": "2026-04-20T23:55:56.562Z",
+      "lastAnalysis": "2026-04-21T07:31:45.473Z",
       "recommendation": {
-        "entryDrawdownPercent": "2.0",
-        "takeProfitPercent": "2.3",
+        "entryDrawdownPercent": "1.7",
+        "takeProfitPercent": "1.5",
         "maxHoldHours": 2,
-        "expectedWinrate": "83%"
+        "expectedWinrate": "100%"
       },
       "verdict": "✅ ПОДХОДИТ",
-      "winrate": "83.3%",
-      "closingRate": "83.3%",
-      "totalEvents": 36,
-      "successfulEvents": 30,
-      "chartPoints": 1999,
+      "winrate": "100.0%",
+      "closingRate": "100.0%",
+      "totalEvents": 2,
+      "successfulEvents": 2,
+      "chartPoints": 175,
       "status": "approved"
     },
     {
@@ -103,5 +103,5 @@
       "status": "approved"
     }
   ],
-  "lastUpdated": "2026-04-20T23:55:56.562Z"
+  "lastUpdated": "2026-04-21T07:31:45.476Z"
 }

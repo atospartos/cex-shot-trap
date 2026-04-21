@@ -1,4 +1,6 @@
-// services/mexcService.js
+
+
+// // services/mexcService.js
 const axios = require('axios');
 const config = require('../config');
 
@@ -8,13 +10,15 @@ async function fetchMexcChunk(symbol, interval, startTime, endTime) {
         url.searchParams.append('symbol', symbol.toUpperCase());
         url.searchParams.append('interval', interval);
         url.searchParams.append('limit', '500');
-        
+
         if (startTime) url.searchParams.append('startTime', startTime);
         if (endTime) url.searchParams.append('endTime', endTime);
-        
+
         const response = await axios.get(url.toString(), { timeout: 15000 });
         if (!response.data || !Array.isArray(response.data)) return [];
-        
+        // В fetchMexcChunk, перед return:
+        console.log(`📡 MEXC URL: ${url.toString()}`);
+        console.log(`📡 MEXC ответ: ${response.data.length} свечей, первая:`, response.data[0]);
         return response.data.map(c => ({
             time: c[0],
             close: parseFloat(c[4])
@@ -28,11 +32,11 @@ async function fetchMexcChunk(symbol, interval, startTime, endTime) {
 
 async function fetchAllMexc(symbol, interval, startTime, endTime, maxQueries) {
     console.log(`   🌐 MEXC запрос: ${symbol}`);
-    
+
     const allCandles = [];
     let currentStart = startTime;
     let queries = 0;
-    
+
     while (currentStart < endTime && queries < maxQueries) {
         const chunk = await fetchMexcChunk(symbol, interval, currentStart, endTime);
         if (chunk.length === 0) break;
@@ -41,14 +45,15 @@ async function fetchAllMexc(symbol, interval, startTime, endTime, maxQueries) {
         if (lastTime === currentStart) break;
         currentStart = lastTime + 1;
         queries++;
-        
+
         if (queries < maxQueries && currentStart < endTime) {
             await new Promise(resolve => setTimeout(resolve, config.REQUEST_DELAY_MS));
         }
     }
-    
+
     const validCandles = allCandles.filter(c => c.close > 0);
     console.log(`   ✅ MEXC: ${validCandles.length} свечей`);
+    console.log(`🔍 MEXC запрос: ${symbol} с ${new Date(startTime).toISOString()} по ${new Date(endTime).toISOString()}`);
     return validCandles;
 }
 
