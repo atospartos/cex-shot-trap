@@ -1,0 +1,107 @@
+{
+  "tokens": [
+    {
+      "symbol": "AIXDROPUSDT",
+      "lastAnalysis": "2026-04-20T15:32:00.930Z",
+      "recommendation": {
+        "entryDrawdownPercent": "2.1",
+        "takeProfitPercent": "2.5",
+        "maxHoldHours": 2,
+        "expectedWinrate": "31%"
+      },
+      "verdict": "❌ НЕ ПОДХОДИТ",
+      "winrate": "30.8%",
+      "closingRate": "30.8%",
+      "totalEvents": 13,
+      "successfulEvents": 4,
+      "chartPoints": 146,
+      "status": "approved"
+    },
+    {
+      "symbol": "67",
+      "lastAnalysis": "2026-04-20T23:55:56.562Z",
+      "recommendation": {
+        "entryDrawdownPercent": "2.0",
+        "takeProfitPercent": "2.3",
+        "maxHoldHours": 2,
+        "expectedWinrate": "83%"
+      },
+      "verdict": "✅ ПОДХОДИТ",
+      "winrate": "83.3%",
+      "closingRate": "83.3%",
+      "totalEvents": 36,
+      "successfulEvents": 30,
+      "chartPoints": 1999,
+      "status": "approved"
+    },
+    {
+      "symbol": "JAGER",
+      "lastAnalysis": "2026-04-20T16:30:26.970Z",
+      "recommendation": {
+        "entryDrawdownPercent": "1.7",
+        "takeProfitPercent": "1.5",
+        "maxHoldHours": 3,
+        "expectedWinrate": "100%"
+      },
+      "verdict": "✅ ПОДХОДИТ",
+      "winrate": "100.0%",
+      "closingRate": "100.0%",
+      "totalEvents": 3,
+      "successfulEvents": 3,
+      "chartPoints": 293,
+      "status": "approved"
+    },
+    {
+      "symbol": "ADO",
+      "lastAnalysis": "2026-04-20T16:49:24.576Z",
+      "recommendation": {
+        "entryDrawdownPercent": "8.3",
+        "takeProfitPercent": "13.2",
+        "maxHoldHours": 3,
+        "expectedWinrate": "67%"
+      },
+      "verdict": "✅ ПОДХОДИТ",
+      "winrate": "66.7%",
+      "closingRate": "66.7%",
+      "totalEvents": 3,
+      "successfulEvents": 2,
+      "chartPoints": 14,
+      "status": "approved"
+    },
+    {
+      "symbol": "CAPTAINBNB",
+      "lastAnalysis": "2026-04-20T18:26:00.860Z",
+      "recommendation": {
+        "entryDrawdownPercent": "1.8",
+        "takeProfitPercent": "2.2",
+        "maxHoldHours": 2,
+        "expectedWinrate": "57%"
+      },
+      "verdict": "✅ ПОДХОДИТ",
+      "winrate": "57.1%",
+      "closingRate": "57.1%",
+      "totalEvents": 238,
+      "successfulEvents": 136,
+      "chartPoints": 1999,
+      "status": "approved"
+    },
+    {
+      "symbol": "共建",
+      "lastAnalysis": "2026-04-20T19:18:51.323Z",
+      "recommendation": {
+        "entryDrawdownPercent": "2.3",
+        "takeProfitPercent": "4.6",
+        "maxHoldHours": 2,
+        "expectedWinrate": "96%"
+      },
+      "verdict": "✅ ПОДХОДИТ",
+      "winrate": "96.0%",
+      "closingRate": "96.0%",
+      "totalEvents": 99,
+      "successfulEvents": 95,
+      "chartPoints": 1622,
+      "status": "approved"
+    }
+  ],
+  "lastUpdated": "2026-04-20T23:55:56.562Z"
+}

@@ -195,7 +195,7 @@ module.exports = [
 
 { symbol: "KEYCAT", address: "0x9a26F5433671751C3276a065f57e5a02D2817973" },
 
-{ symbol: "KIBSHI", address: "0x02e7F808990638E9e67E1f00313037EDe2362361" },
+{ symbol: "KIBSHI", address: "0x02e7F808990638E9e67E1f00313037EDe2362361" }
 
 // { symbol: "KISHU", address: "0xa2b4c0af19cc16a6cfacce81f192b024d625817d" },
 
