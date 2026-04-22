@@ -8,12 +8,12 @@ async function main() {
         maxRequestsPerClient: 500
     });
 
-    const txtfile = path.join(process.cwd(), 'data/tokens/pure_tokens.json');
-    const jsfile = path.join(process.cwd(), 'data/tokens/tokens.js');
+    const pure_tokens = path.join(process.cwd(), 'data/tokens/pure_tokens.json');
+    const contract_list = path.join(process.cwd(), 'data/tokens/tokens.json');
 
     await resolver.updateFromFile(
-        txtfile,
-        jsfile
+        pure_tokens,
+        contract_list
     );
 }
 

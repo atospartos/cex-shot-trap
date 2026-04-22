@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "contracts": "node src/resolver/fetchContracts.js",
+    "contract": "node src/resolver/fetchContracts.js",
     "tokenlist": "node src/resolver/mexcdextokens.js",
     "chartdev": "node --watch charts/server.js",
     "chart": "node charts/server.js"

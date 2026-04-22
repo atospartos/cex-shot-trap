@@ -7,64 +7,29 @@ const { detectChainId } = require('../utils/chainDetector');
 const TOKENS_FILE = config.TOKENS_FILE;
 const TOKENS_DATA_FILE = config.TOKENS_DATA_FILE;
 
-function loadTokensFromJs() {
-    try {
-        const content = fs.readFileSync(TOKENS_FILE, 'utf8');
-        const lines = content.split('\n');
-        const tokens = [];
-
-        for (const line of lines) {
-            const symbolMatch = line.match(/symbol:\s*"([^"]+)"/);
-            const addressMatch = line.match(/address:\s*"([^"]+)"/);
-
-            if (symbolMatch && addressMatch) {
-                tokens.push({
-                    symbol: symbolMatch[1],
-                    address: addressMatch[1],
-                    chainId: 'solana:solana' // временно
-                });
-            }
-        }
-
-        console.log(`📁 Из файла загружено ${tokens.length} токенов`);
-        return tokens;  // ← МАССИВ
-    } catch (error) {
-        console.error('Ошибка загрузки tokens.js:', error.message);
-        return [];  // ← ПУСТОЙ МАССИВ, а не объект
-    }
-}
-
 function loadTokens() {
 
     if (!fs.existsSync(TOKENS_FILE)) {
         throw new Error(`Файл ${TOKENS_FILE} не найден`);
     }
-
     const content = fs.readFileSync(TOKENS_FILE, 'utf8');
     const data = JSON.parse(content);
     let tokensList = [];
-    if (data.tokens && Array.isArray(data.tokens)) {
-        tokensList = data.tokens.map(item => ({
-            symbol: item.symbol,
-            address: item.address,
-            chainId: item.chainId || null
-        }));
-    } else {
+    if (Array.isArray(data)) {
+            tokensList = data.map(item => ({
+                symbol: item.symbol,
+                address: item.address,
+                chainId: item.chainId || null
+            }));
+        } else {
         throw new Error(`Файл ${TOKENS_FILE} неверный формат`);
     }
-
-    console.log(`📖 Прочитано ${tokensList.length} токенов из ${TOKENS_FILE}`);
-
+    // console.log(`📖 Прочитано ${tokensList.length} токенов из ${TOKENS_FILE}`);
     if (tokensList.length === 0) {
         throw new Error(`Файл ${TOKENS_FILE} не содержит токенов`);
     }
-    // console.log(`${data}`);
     return tokensList;
 }
-
-// console.error('Ошибка загрузки TOKENS_FILE data:', error.message);
-
-// return { tokens: [], lastUpdated: null };
 
 
 function loadAnalysisData() {
@@ -144,4 +109,4 @@ function updateTokenAnalysis(symbol, analysis, chartPointsCount) {
     console.log(`💾 Сохранён анализ для ${symbol}: ${analysis.verdict}`);
 }
 
-module.exports = { getAllTokensWithAnalysis, updateTokenAnalysis, loadTokensFromJs, loadTokens };
+module.exports = { getAllTokensWithAnalysis, updateTokenAnalysis, loadTokens };
