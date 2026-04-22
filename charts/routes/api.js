@@ -4,11 +4,11 @@ const config = require('../config');
 const { getConfig } = require('../utils/timeHelpers');
 const { fetchAllMexc, normalizeMexcSymbol } = require('../services/mexcService');
 const { fetchMobulaRange } = require('../services/mobulaService');
-const { getAllTokensWithAnalysis, updateTokenAnalysis, loadTokensFromJs } = require('../services/tokenService');
+const { getAllTokensWithAnalysis, updateTokenAnalysis, loadTokens } = require('../services/tokenService');
 const { findBestTimeShift, alignData, analyzeDrawdowns } = require('../analyzers/drawdownAnalyzer');
 
 router.get('/tokens', (req, res) => {
-    res.json({ success: true, tokens: loadTokensFromJs() });
+    res.json({ success: true, tokens: loadTokens() });
 });
 
 router.get('/chains', (req, res) => {

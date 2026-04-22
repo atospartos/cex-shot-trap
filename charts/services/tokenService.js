@@ -4,19 +4,19 @@ const config = require('../config');
 const { detectChainId } = require('../utils/chainDetector');
 
 // ПРАВИЛЬНОЕ ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ
-const TOKENS_FILE = path.join(process.cwd(), 'data/tokens/tokens.js');
-const TOKENS_DATA_FILE = path.join(process.cwd(), 'data/tokens/tokens_data.json');
+const TOKENS_FILE = config.TOKENS_FILE;
+const TOKENS_DATA_FILE = config.TOKENS_DATA_FILE;
 
 function loadTokensFromJs() {
     try {
         const content = fs.readFileSync(TOKENS_FILE, 'utf8');
         const lines = content.split('\n');
         const tokens = [];
-        
+
         for (const line of lines) {
             const symbolMatch = line.match(/symbol:\s*"([^"]+)"/);
             const addressMatch = line.match(/address:\s*"([^"]+)"/);
-            
+
             if (symbolMatch && addressMatch) {
                 tokens.push({
                     symbol: symbolMatch[1],
@@ -25,7 +25,7 @@ function loadTokensFromJs() {
                 });
             }
         }
-        
+
         console.log(`📁 Из файла загружено ${tokens.length} токенов`);
         return tokens;  // ← МАССИВ
     } catch (error) {
@@ -33,6 +33,39 @@ function loadTokensFromJs() {
         return [];  // ← ПУСТОЙ МАССИВ, а не объект
     }
 }
+
+function loadTokens() {
+
+    if (!fs.existsSync(TOKENS_FILE)) {
+        throw new Error(`Файл ${TOKENS_FILE} не найден`);
+    }
+
+    const content = fs.readFileSync(TOKENS_FILE, 'utf8');
+    const data = JSON.parse(content);
+    let tokensList = [];
+    if (data.tokens && Array.isArray(data.tokens)) {
+        tokensList = data.tokens.map(item => ({
+            symbol: item.symbol,
+            address: item.address,
+            chainId: item.chainId || null
+        }));
+    } else {
+        throw new Error(`Файл ${TOKENS_FILE} неверный формат`);
+    }
+
+    console.log(`📖 Прочитано ${tokensList.length} токенов из ${TOKENS_FILE}`);
+
+    if (tokensList.length === 0) {
+        throw new Error(`Файл ${TOKENS_FILE} не содержит токенов`);
+    }
+    // console.log(`${data}`);
+    return tokensList;
+}
+
+// console.error('Ошибка загрузки TOKENS_FILE data:', error.message);
+
+// return { tokens: [], lastUpdated: null };
+
 
 function loadAnalysisData() {
     try {
@@ -61,11 +94,11 @@ function getAllTokensWithAnalysis() {
     const rawTokens = loadTokensFromJs();
     const analysisData = loadAnalysisData();
     const analysisMap = new Map();
-    
+
     for (const token of analysisData.tokens || []) {
         analysisMap.set(token.symbol, token);
     }
-    
+
     // Возвращаем МАССИВ, а не объект
     const result = rawTokens.map(token => ({
         ...token,
@@ -77,7 +110,7 @@ function getAllTokensWithAnalysis() {
         winrate: analysisMap.get(token.symbol)?.winrate || null,
         closingRate: analysisMap.get(token.symbol)?.closingRate || null
     }));
-    
+
     console.log(`📋 Загружено токенов: ${result.length}`);  // отладка
     return result;  // ← МАССИВ
 }
@@ -85,7 +118,7 @@ function getAllTokensWithAnalysis() {
 function updateTokenAnalysis(symbol, analysis, chartPointsCount) {
     const analysisData = loadAnalysisData();
     let tokensList = analysisData.tokens || [];
-    
+
     const existingIndex = tokensList.findIndex(t => t.symbol === symbol);
     const tokenData = {
         symbol,
@@ -99,16 +132,16 @@ function updateTokenAnalysis(symbol, analysis, chartPointsCount) {
         chartPoints: chartPointsCount,
         status: analysis.verdict.includes('ПОДХОДИТ') ? 'approved' : 'rejected'
     };
-    
+
     if (existingIndex !== -1) {
         tokensList[existingIndex] = { ...tokensList[existingIndex], ...tokenData };
     } else {
         tokensList.push(tokenData);
     }
-    
+
     analysisData.tokens = tokensList;
     saveAnalysisData(analysisData);
     console.log(`💾 Сохранён анализ для ${symbol}: ${analysis.verdict}`);
 }
 
-module.exports = { getAllTokensWithAnalysis, updateTokenAnalysis, loadTokensFromJs };
+module.exports = { getAllTokensWithAnalysis, updateTokenAnalysis, loadTokensFromJs, loadTokens };

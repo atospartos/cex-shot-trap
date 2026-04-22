@@ -20,7 +20,7 @@ module.exports = {
         '30m': { mexc: '30m', mobula: '30m', ms: 30 * 60 * 1000, candlesPerDay: 48, maxDays: 20, maxQueries: 6 }
     },
     
-    TOKENS_FILE: path.join(process.cwd(), 'data/tokens/tokens.js'),
+    TOKENS_FILE: path.join(process.cwd(), 'data/tokens/tokens.json'),
     TOKENS_DATA_FILE: path.join(process.cwd(), 'data/tokens/tokens_data.json'),
     CACHE_DIR: path.join(process.cwd(), 'data/cache')
 };
