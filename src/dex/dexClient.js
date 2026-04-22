@@ -1,4 +1,5 @@
 const logger = require('../core/logger');
+const axios = require('axios');
 
 class DexClient {
     /**
@@ -41,7 +42,7 @@ class DexClient {
         try {
             logger.debug(`🔍 Точный поиск по адресу: ${tokenAddress}`);
 
-            const axios = require('axios');
+            
             const response = await axios.get(
                 `https://api.dexscreener.com/latest/dex/search?q=${tokenAddress}`,
                 { timeout: 2000 }

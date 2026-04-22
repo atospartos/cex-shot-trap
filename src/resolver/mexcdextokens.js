@@ -151,30 +151,6 @@ async function getBybitTokens() {
     }
 }
 
-// ---------- 6. Проверка DEX ликвидности ----------
-async function hasDexLiquidity(tokenSymbol) {
-    const url = `https://api.dexscreener.com/latest/dex/search?q=${tokenSymbol}`;
-
-    try {
-        const response = await axios.get(url, { timeout: 10000 });
-        const pairs = response.data.pairs;
-
-        if (!pairs || pairs.length === 0) return false;
-
-        for (const pair of pairs) {
-            const liquidity = parseFloat(pair.liquidity?.usd);
-            const volume24h = parseFloat(pair.volume?.h24);
-            if (liquidity > 40000 || volume24h > 3000) {
-                 console.log(` ${tokenSymbol}  liquidity: '${liquidity}$' volume:  '${volume24h}$'`);
-                return true;
-            }
-        }
-        return false;
-    } catch (error) {
-        return false;
-    }
-}
-
 // ---------- 9. ГЛАВНАЯ ЛОГИКА ----------
 async function findUniqueMexcTokens() {
     console.log('\n🔍 Поиск токенов на MEXC + DEX...\n');
@@ -183,7 +159,7 @@ async function findUniqueMexcTokens() {
 
     if (mexcTokens.size === 0) {
         console.error('❌ Не удалось получить список токенов с MEXC.');
-        return { pure: [], singleExchange: [] };
+        return { pure: [] };
     }
 
     console.log('\n⏳ Получение списков с других бирж...\n');
@@ -220,11 +196,7 @@ async function findUniqueMexcTokens() {
         const majorExchanges = [onBinance, onOKX, onBybit, onGate];
         const majorCount = majorExchanges.filter(Boolean).length;
 
-        const hasDex = await hasDexLiquidity(token);
-
-        if (!hasDex) continue;
-
-        // Категория A: чистые (нет ни на одной крупной бирже)
+        //Чистые (нет ни на одной крупной бирже)
         if (majorCount === 0) {
             pureResults.push(token);
             console.log(`✅ ${token}}`);
