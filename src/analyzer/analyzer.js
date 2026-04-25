@@ -4,25 +4,29 @@ const eventEmitter = require('../core/eventEmitter');
 
 class Analyzer {
     constructor() {
-        this.activeTraps = new Map();
+        this.activeTraps = new Map();        
+        this.activePositions = new Map();     // полностью исполненные позиции
+        this.partialPositions = new Map();    // частично исполненные позиции
+        
         this.priceHistory = new Map();
-        this.lastProcessedPrices = new Map();
-        this.tokensConfig = new Map(); // symbol -> strategy config
+        this.tokensConfig = new Map();
 
-        // Базовая конфигурация (по умолчанию)
         this.defaultConfig = {
             trapOffsetPercent: 10,
             takeProfitRecoveryPercent: 70,
             positionSize: 5,
             maxConsecutiveLosses: 3,
-            cooldownMinutes: 60
+            cooldownMinutes: 60,
+            maxDexDropPercent: 15,
+            trapApproachThreshold: 50
         };
+
+        this.positionTimeoutMs = 3 * 60 * 60 * 1000;
 
         this.setupListeners();
         this.loadTokensConfig();
         
-        logger.info('🔍 Анализатор (ловля прострелов) инициализирован');
-        logger.info(`   Индивидуальные настройки для ${this.tokensConfig.size} токенов`);
+        logger.info('🔍 Анализатор (лонг-ловушка) инициализирован');
     }
 
     loadTokensConfig() {
@@ -35,17 +39,17 @@ class Analyzer {
                         takeProfitRecoveryPercent: token.strategy.takeProfitRecoveryPercent || this.defaultConfig.takeProfitRecoveryPercent,
                         positionSize: token.strategy.positionSize || this.defaultConfig.positionSize,
                         maxConsecutiveLosses: token.strategy.maxConsecutiveLosses || this.defaultConfig.maxConsecutiveLosses,
-                        cooldownMinutes: token.strategy.cooldownMinutes || this.defaultConfig.cooldownMinutes
+                        cooldownMinutes: token.strategy.cooldownMinutes || this.defaultConfig.cooldownMinutes,
+                        maxDexDropPercent: token.strategy.maxDexDropPercent || this.defaultConfig.maxDexDropPercent,
+                        trapApproachThreshold: token.strategy.trapApproachThreshold || this.defaultConfig.trapApproachThreshold
                     });
-                    
-                    logger.info(`   ${token.symbol}: отступ ${this.tokensConfig.get(token.symbol).trapOffsetPercent}%, тейк ${this.tokensConfig.get(token.symbol).takeProfitRecoveryPercent}%, размер $${this.tokensConfig.get(token.symbol).positionSize}`);
                 } else {
-                    // Используем настройки по умолчанию
                     this.tokensConfig.set(token.symbol, { ...this.defaultConfig });
                 }
             }
+            logger.info(`📋 Загружена конфигурация для ${this.tokensConfig.size} токенов`);
         } catch (error) {
-            logger.warn(`Ошибка загрузки конфигурации токенов: ${error.message}`);
+            logger.warn(`Ошибка загрузки конфигурации: ${error.message}`);
         }
     }
 
@@ -56,27 +60,42 @@ class Analyzer {
     setupListeners() {
         eventEmitter.on('data:ready', this.processData.bind(this));
         eventEmitter.on('position:opened', this.onPositionOpened.bind(this));
+        eventEmitter.on('position:partial_opened', this.onPartialPositionOpened.bind(this));
         eventEmitter.on('position:closed', this.onPositionClosed.bind(this));
+        eventEmitter.on('position:partial_closed', this.onPartialPositionClosed.bind(this));
+        eventEmitter.on('trap:cancelled', this.onTrapCancelled.bind(this));
+        eventEmitter.on('error:executor', this.onExecutorError.bind(this));
     }
+
+    // ==================== ИСТОРИЯ ЦЕН ====================
 
     updatePriceHistory(symbol, dexPrice, cexPrice, timestamp) {
         if (!this.priceHistory.has(symbol)) {
             this.priceHistory.set(symbol, { dex: [], cex: [] });
         }
-
         const history = this.priceHistory.get(symbol);
         history.dex.push({ price: dexPrice, timestamp });
         history.cex.push({ price: cexPrice, timestamp });
 
-        const cutoff = timestamp - (60 * 60 * 1000);
+        const cutoff = timestamp - (24 * 60 * 60 * 1000);
         history.dex = history.dex.filter(h => h.timestamp > cutoff);
         history.cex = history.cex.filter(h => h.timestamp > cutoff);
     }
 
+    getLatestDexPrice(symbol) {
+        const history = this.priceHistory.get(symbol);
+        return history?.dex[history.dex.length - 1]?.price || null;
+    }
+
     getLatestCexPrice(symbol) {
         const history = this.priceHistory.get(symbol);
-        if (!history || history.cex.length === 0) return null;
-        return history.cex[history.cex.length - 1].price;
+        return history?.cex[history.cex.length - 1]?.price || null;
+    }
+
+    // ==================== РАСЧЁТ ЦЕН ====================
+
+    calculateTrapPrice(dexPrice, offsetPercent) {
+        return dexPrice * (1 - offsetPercent / 100);
     }
 
     calculateTakeProfitPrice(entryPrice, currentDexPrice, currentCexPrice, recoveryPercent) {
@@ -88,237 +107,295 @@ class Analyzer {
         return entryPrice + recoveryAmount;
     }
 
+    // ==================== ОСНОВНАЯ ЛОГИКА ====================
+
     processData({ symbol, dexPrice, cexPrice, timestamp }) {
         if (!dexPrice || !cexPrice) return;
 
         this.updatePriceHistory(symbol, dexPrice, cexPrice, timestamp);
 
         const activeTrap = this.activeTraps.get(symbol);
-        const lastPrices = this.lastProcessedPrices.get(symbol);
+        const fullPosition = this.activePositions.get(symbol);
+        const partialPosition = this.partialPositions.get(symbol);
 
-        this.lastProcessedPrices.set(symbol, { dexPrice, cexPrice, timestamp });
+        // Обновляем существующие позиции
+        if (fullPosition) {
+            this.updateActivePosition(symbol, fullPosition, dexPrice, cexPrice);
+        }
+        if (partialPosition) {
+            this.updatePartialPosition(symbol, partialPosition, dexPrice, cexPrice);
+        }
 
-        if (activeTrap) {
-            this.updateActiveTrap(symbol, activeTrap, dexPrice, cexPrice, timestamp, lastPrices);
-        } else {
-            this.createTrap(symbol, dexPrice, cexPrice, timestamp);
+        // Обновляем или создаём ловушку (только если нет активных позиций)
+        if (!fullPosition && !partialPosition) {
+            if (activeTrap) {
+                this.updateActiveTrap(symbol, activeTrap, dexPrice, cexPrice);
+            } else {
+                this.createTrap(symbol, dexPrice, cexPrice, timestamp);
+            }
         }
     }
 
+    // ==================== ЛОВУШКА ====================
+
     createTrap(symbol, dexPrice, cexPrice, timestamp) {
         const config = this.getTokenConfig(symbol);
-        const trapPrice = dexPrice * (1 - config.trapOffsetPercent / 100);
+        const trapPrice = this.calculateTrapPrice(dexPrice, config.trapOffsetPercent);
         const takeProfitPrice = this.calculateTakeProfitPrice(
             trapPrice, dexPrice, cexPrice, config.takeProfitRecoveryPercent
         );
 
         const trap = {
-            id: `${symbol}_${timestamp}`,
             symbol,
             createdAt: timestamp,
-            dexPrice: dexPrice,
-            cexPrice: cexPrice,
+            dexPrice,
+            cexPrice,
             originalDexPrice: dexPrice,
             originalCexPrice: cexPrice,
-            trapPrice: trapPrice,
-            takeProfitPrice: takeProfitPrice,
+            trapPrice,
+            takeProfitPrice,
             lastDexPrice: dexPrice,
             lastCexPrice: cexPrice,
             status: 'pending',
             remainingSize: config.positionSize,
             totalSize: config.positionSize,
-            config: config
+            config
         };
 
         this.activeTraps.set(symbol, trap);
 
-        logger.debug(`📌 ЛОВУШКА ${symbol}`, {
-            dexPrice: `$${dexPrice.toFixed(6)}`,
-            cexPrice: `$${cexPrice.toFixed(6)}`,
-            trapOffset: `${config.trapOffsetPercent}%`,
-            trapPrice: `$${trapPrice.toFixed(6)}`,
-            takeProfit: `$${takeProfitPrice.toFixed(6)}`,
-            size: `${config.positionSize} USDT`
-        });
+        logger.debug(`📌 ЛОВУШКА ${symbol}: $${trapPrice} (отступ ${config.trapOffsetPercent}%)`);
 
         eventEmitter.emit('signal:create_trap', {
             symbol,
             dexPrice,
             trapPrice,
+            takeProfitPrice,
             size: config.positionSize
         });
     }
 
-    updateActiveTrap(symbol, trap, dexPrice, cexPrice, timestamp, lastPrices) {
-        const dexRising = dexPrice > trap.lastDexPrice;
-        const dexFalling = dexPrice < trap.lastDexPrice;
-        const cexRising = cexPrice > trap.lastCexPrice;
-        const cexFalling = cexPrice < trap.lastCexPrice;
-        const cexStable = Math.abs(cexPrice - trap.lastCexPrice) < 0.00001;
-        
+    updateActiveTrap(symbol, trap, dexPrice, cexPrice) {
+        const config = trap.config;
         const isNotExecuted = trap.status === 'pending';
-        const isExecuted = trap.status === 'active' || trap.remainingSize < trap.totalSize;
+        
+        if (!isNotExecuted) return;
 
-        // DEX РАСТЕТ
-        if (dexRising) {
-            if (cexStable && isNotExecuted) {
-                logger.info(`📈 DEX ↑ CEX → | НЕ ИСПОЛНЕН | ВХОД ПО CEX (раскорелляция) для ${symbol}`);
-                this.decouplingEntry(symbol, trap, dexPrice, cexPrice);
-                return;
-            }
-            
-            if (cexRising && isNotExecuted) {
-                logger.info(`🔄 DEX ↑ CEX ↑ | НЕ ИСПОЛНЕН | КОРРЕКТИРОВКА ЛОВУШКИ для ${symbol}`);
-                this.adjustTrap(symbol, trap, dexPrice, cexPrice);
-                return;
-            }
-            
-            if (isExecuted) {
-                logger.info(`🔄 DEX ↑ | ИСПОЛНЕН | КОРРЕКТИРОВКА ТЕЙКА + ПЕРЕСТАНОВКА ЛОВУШКИ для ${symbol}`);
-                this.adjustTakeProfit(symbol, trap, dexPrice, cexPrice);
-                if (trap.remainingSize > 0) {
-                    this.adjustTrap(symbol, trap, dexPrice, cexPrice);
-                }
-                return;
-            }
-        }
+        const newTrapPrice = this.calculateTrapPrice(dexPrice, config.trapOffsetPercent);
         
-        // DEX ПАДАЕТ
-        if (dexFalling) {
-            if (isNotExecuted) {
-                logger.info(`📉 DEX ↓ | НЕ ИСПОЛНЕН | УБИРАЕМ ЛОВУШКУ для ${symbol}`);
-                this.cancelTrap(symbol, trap);
-                return;
-            }
-            
-            if (isExecuted) {
-                logger.info(`📉 DEX ↓ | ИСПОЛНЕН | УБИРАЕМ ЛОВУШКУ + КОРРЕКТИРОВКА ТЕЙКА для ${symbol}`);
-                if (trap.remainingSize > 0) {
-                    this.cancelTrap(symbol, trap);
-                }
-                this.adjustTakeProfit(symbol, trap, dexPrice, cexPrice);
-                return;
-            }
+        // 1. Резкое падение DEX — отмена
+        const dexDropPercent = ((trap.originalDexPrice - dexPrice) / trap.originalDexPrice) * 100;
+        if (dexDropPercent >= config.maxDexDropPercent) {
+            logger.warn(`🛡️ РЕЗКОЕ ПАДЕНИЕ DEX ${symbol}: ${dexDropPercent.toFixed(1)}%`);
+            this.cancelTrap(symbol, trap, 'dex_drop');
+            return;
         }
-        
-        trap.lastDexPrice = dexPrice;
-        trap.lastCexPrice = cexPrice;
+
+        // 2. Приближение DEX к ловушке — перестановка
+        const originalDistance = trap.originalDexPrice - trap.trapPrice;
+        const currentDistance = dexPrice - trap.trapPrice;
+        const approachPercent = originalDistance > 0 
+            ? ((originalDistance - currentDistance) / originalDistance) * 100 
+            : 0;
+
+        if (approachPercent >= config.trapApproachThreshold && currentDistance > 0) {
+            logger.info(`🔄 ПРИБЛИЖЕНИЕ DEX К ЛОВУШКЕ ${symbol}: ${approachPercent.toFixed(1)}%`);
+            trap.trapPrice = newTrapPrice;
+            trap.dexPrice = dexPrice;
+            
+            eventEmitter.emit('signal:update_trap', {
+                symbol,
+                newTrapPrice,
+                newDexPrice: dexPrice
+            });
+            return;
+        }
+
+        // 3. Обычное обновление
+        if (newTrapPrice !== trap.trapPrice) {
+            trap.trapPrice = newTrapPrice;
+            trap.dexPrice = dexPrice;
+            trap.lastDexPrice = dexPrice;
+            trap.lastCexPrice = cexPrice;
+            
+            eventEmitter.emit('signal:update_trap', {
+                symbol,
+                newTrapPrice,
+                newDexPrice: dexPrice
+            });
+            
+            const direction = newTrapPrice > trap.trapPrice ? 'поднята' : 'опущена';
+            logger.debug(`📉📈 Ловушка ${symbol} ${direction} до $${newTrapPrice}`);
+        }
     }
 
-    decouplingEntry(symbol, trap, dexPrice, cexPrice) {
+    cancelTrap(symbol, trap, reason) {
         eventEmitter.emit('signal:cancel_trap', { symbol });
-        
-        eventEmitter.emit('signal:decoupling_entry', {
-            symbol,
-            dexPrice,
-            cexPrice,
-            size: trap.totalSize
-        });
-        
         this.activeTraps.delete(symbol);
+        logger.info(`❌ Ловушка ${symbol} отменена: ${reason}`);
     }
 
-    adjustTrap(symbol, trap, dexPrice, cexPrice) {
-        const config = this.getTokenConfig(symbol);
-        const newTrapPrice = dexPrice * (1 - config.trapOffsetPercent / 100);
-        
-        trap.trapPrice = newTrapPrice;
-        trap.dexPrice = dexPrice;
-        
-        eventEmitter.emit('signal:update_trap', {
-            symbol,
-            newTrapPrice,
-            newDexPrice: dexPrice
-        });
-    }
+    // ==================== АКТИВНЫЕ ПОЗИЦИИ ====================
 
-    adjustTakeProfit(symbol, trap, dexPrice, cexPrice) {
-        const config = this.getTokenConfig(symbol);
-        const entryPrice = trap.actualEntryPrice || trap.trapPrice;
+    updateActivePosition(symbol, position, dexPrice, cexPrice) {
         const newTakeProfit = this.calculateTakeProfitPrice(
-            entryPrice, dexPrice, cexPrice, config.takeProfitRecoveryPercent
+            position.entryPrice, dexPrice, cexPrice, position.config.takeProfitRecoveryPercent
         );
         
-        trap.takeProfitPrice = newTakeProfit;
+        const changePercent = Math.abs((newTakeProfit - position.takeProfitPrice) / position.takeProfitPrice) * 100;
         
-        eventEmitter.emit('signal:update_take_profit', {
-            symbol,
-            newTakeProfit,
-            dexPrice,
-            size: trap.totalSize - (trap.remainingSize || 0)
-        });
+        if (changePercent > 0.5) {
+            position.takeProfitPrice = newTakeProfit;
+            
+            eventEmitter.emit('signal:update_take_profit', {
+                symbol,
+                newTakeProfit,
+                size: position.size
+            });
+            
+            logger.debug(`🔄 Тейк ${symbol} скорректирован: $${newTakeProfit}`);
+        }
     }
 
-    cancelTrap(symbol, trap) {
-        eventEmitter.emit('signal:cancel_trap', { symbol });
-        this.activeTraps.delete(symbol);
+    updatePartialPosition(symbol, partialPos, dexPrice, cexPrice) {
+        const newTakeProfit = this.calculateTakeProfitPrice(
+            partialPos.entryPrice, dexPrice, cexPrice, partialPos.config.takeProfitRecoveryPercent
+        );
+        
+        const changePercent = Math.abs((newTakeProfit - partialPos.takeProfitPrice) / partialPos.takeProfitPrice) * 100;
+        
+        if (changePercent > 0.5) {
+            partialPos.takeProfitPrice = newTakeProfit;
+            
+            eventEmitter.emit('signal:update_take_profit', {
+                symbol,
+                newTakeProfit,
+                size: partialPos.filledSize
+            });
+            
+            logger.debug(`🔄 Тейк частичной позиции ${symbol} скорректирован: $${newTakeProfit}`);
+        }
     }
 
-    onPositionOpened({ symbol, entryPrice, dexPrice }) {
-        const trap = this.activeTraps.get(symbol);
-        if (!trap || trap.status !== 'pending') return;
+    // ==================== ОБРАБОТКА СОБЫТИЙ ОТ EXECUTOR ====================
 
-        trap.status = 'active';
-        trap.actualEntryPrice = entryPrice;
-        trap.activatedAt = Date.now();
-        trap.remainingSize = trap.totalSize;
-        
-        const currentCexPrice = this.getLatestCexPrice(symbol);
+    onPositionOpened({ symbol, entryPrice, dexPrice, size }) {
         const config = this.getTokenConfig(symbol);
-        const currentTakeProfit = this.calculateTakeProfitPrice(
-            entryPrice, dexPrice, currentCexPrice, config.takeProfitRecoveryPercent
+        const currentDexPrice = this.getLatestDexPrice(symbol);
+        const currentCexPrice = this.getLatestCexPrice(symbol);
+        const takeProfitPrice = this.calculateTakeProfitPrice(
+            entryPrice, currentDexPrice, currentCexPrice, config.takeProfitRecoveryPercent
         );
-        trap.takeProfitPrice = currentTakeProfit;
-
-        logger.info(`🎯 ЛОВУШКА СРАБОТАЛА ${symbol}`, {
-            entryPrice: `$${entryPrice.toFixed(6)}`,
-            dexPrice: `$${dexPrice.toFixed(6)}`,
-            takeProfit: `$${currentTakeProfit.toFixed(6)}`,
-            size: `${trap.totalSize} USDT`
+        
+        this.activePositions.set(symbol, {
+            symbol,
+            entryPrice,
+            size,
+            takeProfitPrice,
+            config,
+            openedAt: Date.now()
         });
-
+        
+        // Удаляем ловушку, если была
+        if (this.activeTraps.has(symbol)) {
+            this.activeTraps.delete(symbol);
+        }
+        
         eventEmitter.emit('signal:update_take_profit', {
             symbol,
-            newTakeProfit: currentTakeProfit,
-            size: trap.totalSize
+            newTakeProfit: takeProfitPrice,
+            size
         });
-
-        setTimeout(() => {
-            this.checkActiveTimeout(symbol);
-        }, this.config.maxActiveTimeMs);
+        
+        logger.info(`🎯 ПОЗИЦИЯ ОТКРЫТА ${symbol}: $${entryPrice}, размер ${size} USDT, тейк $${takeProfitPrice}`);
+        
+        setTimeout(() => this.checkPositionTimeout(symbol), this.positionTimeoutMs);
     }
 
-    checkActiveTimeout(symbol) {
-        const trap = this.activeTraps.get(symbol);
-        if (!trap || trap.status !== 'active') return;
+    onPartialPositionOpened({ symbol, entryPrice, dexPrice, filledSize, remainingSize, totalSize }) {
+        const config = this.getTokenConfig(symbol);
+        const currentDexPrice = this.getLatestDexPrice(symbol);
+        const currentCexPrice = this.getLatestCexPrice(symbol);
+        const takeProfitPrice = this.calculateTakeProfitPrice(
+            entryPrice, currentDexPrice, currentCexPrice, config.takeProfitRecoveryPercent
+        );
+        
+        this.partialPositions.set(symbol, {
+            symbol,
+            entryPrice,
+            filledSize,
+            remainingSize,
+            totalSize,
+            takeProfitPrice,
+            config,
+            openedAt: Date.now()
+        });
+        
+        eventEmitter.emit('signal:update_take_profit', {
+            symbol,
+            newTakeProfit: takeProfitPrice,
+            size: filledSize
+        });
+        
+        logger.info(`📊 ЧАСТИЧНАЯ ПОЗИЦИЯ ${symbol}: ${filledSize} USDT по $${entryPrice}, тейк $${takeProfitPrice}, остаток ловушки ${remainingSize} USDT`);
+    }
 
+    onPositionClosed({ symbol, reason, profitPercent, filledSize }) {
+        const position = this.activePositions.get(symbol);
+        if (position) {
+            logger.info(`🔒 ПОЗИЦИЯ ЗАКРЫТА ${symbol}: ${reason} (${profitPercent > 0 ? '+' : ''}${profitPercent?.toFixed(2)}%)`);
+            this.activePositions.delete(symbol);
+        }
+    }
+
+    onPartialPositionClosed({ symbol, filledSize, remainingSize, profitPercent }) {
+        const partialPos = this.partialPositions.get(symbol);
+        if (partialPos) {
+            const newFilledSize = partialPos.filledSize - filledSize;
+            
+            if (newFilledSize <= 0) {
+                this.partialPositions.delete(symbol);
+                logger.info(`🔒 ЧАСТИЧНАЯ ПОЗИЦИЯ ${symbol} ПОЛНОСТЬЮ ЗАКРЫТА: прибыль ${profitPercent > 0 ? '+' : ''}${profitPercent?.toFixed(2)}%`);
+            } else {
+                partialPos.filledSize = newFilledSize;
+                logger.info(`🔒 ЧАСТИЧНАЯ ПОЗИЦИЯ ${symbol} ЧАСТИЧНО ЗАКРЫТА: закрыто ${filledSize} USDT, осталось ${newFilledSize} USDT`);
+            }
+        }
+    }
+
+    onTrapCancelled({ symbol, reason }) {
+        if (this.activeTraps.has(symbol)) {
+            this.activeTraps.delete(symbol);
+            logger.info(`❌ Ловушка ${symbol} отменена (событие): ${reason}`);
+        }
+    }
+
+    onExecutorError({ symbol, error, action }) {
+        logger.error(`⚠️ ОШИБКА EXECUTOR ${symbol}: ${action} — ${error}`);
+        
+        // При критической ошибке отменяем ловушку
+        if (this.activeTraps.has(symbol) && action === 'create_trap') {
+            this.cancelTrap(symbol, this.activeTraps.get(symbol), 'executor_error');
+        }
+    }
+
+    checkPositionTimeout(symbol) {
+        const position = this.activePositions.get(symbol);
+        if (!position) return;
+        
         const currentCexPrice = this.getLatestCexPrice(symbol);
         if (!currentCexPrice) return;
-
-        const profitPercent = ((currentCexPrice - trap.actualEntryPrice) / trap.actualEntryPrice) * 100;
-
-        logger.warn(`⏰ ТАЙМАУТ ${symbol} (3 часа)`, {
-            entryPrice: `$${trap.actualEntryPrice.toFixed(6)}`,
-            currentPrice: `$${currentCexPrice.toFixed(6)}`,
-            profitPercent: `${profitPercent.toFixed(2)}%`
-        });
-
+        
+        const profitPercent = ((currentCexPrice - position.entryPrice) / position.entryPrice) * 100;
+        
+        logger.warn(`⏰ ТАЙМАУТ ПОЗИЦИИ ${symbol} (3ч): профит ${profitPercent.toFixed(2)}%`);
+        
         eventEmitter.emit('signal:close_position', {
             symbol,
-            size: trap.totalSize,
+            size: position.size,
             price: currentCexPrice,
             reason: 'timeout'
         });
-
-        this.activeTraps.delete(symbol);
-    }
-
-    onPositionClosed({ symbol, reason, profitPercent }) {
-        const trap = this.activeTraps.get(symbol);
-        if (trap) {
-            logger.info(`🔒 ПОЗИЦИЯ ЗАКРЫТА ${symbol}: ${reason} (${profitPercent > 0 ? '+' : ''}${profitPercent?.toFixed(2)}%)`);
-            this.activeTraps.delete(symbol);
-        }
     }
 }
 
