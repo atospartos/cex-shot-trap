@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('✅ DOM загружен, инициализация...');
 
     const symbolInput = document.getElementById('symbol');
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     option.textContent = chain.name;
                     chainIdSelect.appendChild(option);
                 });
-                chainIdSelect.value = 'solana:solana';
+                // chainIdSelect.value = 'solana:solana';
             }
         } catch (error) {
             console.error('Ошибка загрузки сетей:', error);
@@ -87,9 +87,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadTokenToForm(token) {
         if (!token) return;
+
         symbolInput.value = token.symbol;
         tokenAddressInput.value = token.address;
-        chainIdSelect.value = token.chainId || 'solana:solana';
+
+        // 🟢 Прямая установка chainId
+        const targetChainId = token.chainId;
+
+        // Ищем опцию с таким значением
+        let found = false;
+        for (let i = 0; i < chainIdSelect.options.length; i++) {
+            if (chainIdSelect.options[i].value === targetChainId) {
+                chainIdSelect.selectedIndex = i;
+                found = true;
+                console.log(`✅ Сеть установлена: ${targetChainId}`);
+                break;
+            }
+        }
+
+        if (!found) {
+            console.warn(`⚠️ Сеть ${targetChainId} не найдена в списке. Доступные:`,
+                Array.from(chainIdSelect.options).map(opt => opt.value));
+            chainIdSelect.value = ''; // сброс, чтобы пользователь выбрал вручную
+            setStatus(`⚠️ Сеть ${targetChainId} не найдена, выберите вручную`, false, false, true);
+        }
+
+        // Отображаем сохранённый анализ
         if (token.recommendation) {
             resultsPanel.style.display = 'block';
             document.getElementById('winrate').innerHTML = token.winrate || '—';
@@ -105,17 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsPanel.style.display = 'none';
         }
     }
-
-    tokenSelect.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.value);
-        if (!isNaN(idx) && currentTokens[idx]) loadTokenToForm(currentTokens[idx]);
-    });
-
-    refreshTokensBtn.addEventListener('click', loadTokensList);
-    clearCacheBtn.addEventListener('click', async () => {
-        await fetch('/api/cache/clear', { method: 'POST' });
-        setStatus('🗑️ Кеш очищен', false, true);
-    });
 
     function renderChart(data) {
         const canvas = document.getElementById('spreadChart');
@@ -151,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         mode: 'index',
                         intersect: false,
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 let label = context.dataset.label || '';
                                 let value = context.raw;
                                 if (context.dataset.label.includes('Спред')) {
@@ -257,4 +269,25 @@ document.addEventListener('DOMContentLoaded', function() {
     analyzeBtn.addEventListener('click', runAnalysis);
     loadChains();
     loadTokensList();
+
+    // ========== ДОБАВИТЬ ПОСЛЕ loadTokensList() ==========
+    tokenSelect.addEventListener('change', function () {
+        const selectedIndex = tokenSelect.value;
+        if (selectedIndex === "") {
+            symbolInput.value = '';
+            tokenAddressInput.value = '';
+            chainIdSelect.value = '';
+            resultsPanel.style.display = 'none';
+            setStatus('Выберите токен из списка', false, false, true);
+            return;
+        }
+
+        const selectedToken = currentTokens[parseInt(selectedIndex)];
+        if (selectedToken) {
+            loadTokenToForm(selectedToken);
+            setStatus(`✅ Токен: ${selectedToken.symbol} | Сеть: ${selectedToken.chainId}`, false, true);
+        } else {
+            setStatus('❌ Ошибка загрузки токена', true);
+        }
+    });
 });

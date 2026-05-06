@@ -1,5 +1,6 @@
 // analyzers/drawdownAnalyzer.js
 const { median } = require('../utils/timeHelpers');
+const { fetchGeckoTerminalOHLCV } = require('../services/geckoTerminalService');
 
 function findBestTimeShift(mexcData, mobulaData, intervalMs, toleranceMs, steps = 10) {
     const stepMs = Math.floor(intervalMs / steps);

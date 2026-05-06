@@ -1,30 +1,69 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
-const { detectChainId } = require('../utils/chainDetector');
+// const { detectChainId } = require('../utils/chainDetector');
 
 // ПРАВИЛЬНОЕ ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ
 const TOKENS_FILE = config.TOKENS_FILE;
 const TOKENS_DATA_FILE = config.TOKENS_DATA_FILE;
 
-function loadTokens() {
+// Функция нормализации chainId
+function normalizeChainId(chainId) {
+    if (!chainId) return null;
+    
+    const input = chainId.toString().toLowerCase().trim();
+    
+    // Маппинг различных форматов
+    const mapping = {
+        // Solana
+        'solana': 'solana:solana',       
+        // EVM сети
+        'ethereum': 'evm:1',        
+        'bsc': 'evm:56',        
+        'polygon': 'evm:137',       
+        'arbitrum': 'evm:42161',
+        'optimism': 'evm:10',
+        'base': 'evm:8453',
+        'avalanche': 'evm:43114',
+        // TON
+        'ton': 'ton:ton',
+        // Другие сети (пока без поддержки, но сохраняем)
+        'xrpl': 'xrpl:xrpl',
+        'algorand': 'algorand:algorand',
+        'hyperevm': 'hyperevm:hyperevm'
+    };
+    
+    if (mapping[input]) {
+        return mapping[input];
+    }
+    
+    console.warn(`⚠️ Неизвестный chainId: ${chainId}`);
+    return chainId;
+}
 
+function loadTokens() {
     if (!fs.existsSync(TOKENS_FILE)) {
         throw new Error(`Файл ${TOKENS_FILE} не найден`);
     }
     const content = fs.readFileSync(TOKENS_FILE, 'utf8');
     const data = JSON.parse(content);
     let tokensList = [];
+    
     if (Array.isArray(data)) {
-            tokensList = data.map(item => ({
-                symbol: item.symbol,
-                address: item.address,
-                chainId: item.chainId || null
-            }));
-        } else {
+        tokensList = data.map(item => ({
+            symbol: item.symbol,
+            address: item.address,
+            chainId: normalizeChainId(item.chainId),  // ← нормализуем
+            dexId: item.dexId,
+            liquidityUSD: item.liquidityUSD,
+            volume24hUSD: item.volume24hUSD,
+            priceUSD: item.priceUSD,
+            marketCapUSD: item.marketCapUSD
+        }));
+    } else {
         throw new Error(`Файл ${TOKENS_FILE} неверный формат`);
     }
-    // console.log(`📖 Прочитано ${tokensList.length} токенов из ${TOKENS_FILE}`);
+    
     if (tokensList.length === 0) {
         throw new Error(`Файл ${TOKENS_FILE} не содержит токенов`);
     }

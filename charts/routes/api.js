@@ -5,7 +5,7 @@ const { getConfig } = require('../utils/timeHelpers');
 const { fetchAllMexc, normalizeMexcSymbol } = require('../services/mexcService');
 const { fetchMobulaRange } = require('../services/mobulaService');
 const { getAllTokensWithAnalysis, updateTokenAnalysis, loadTokens } = require('../services/tokenService');
-const { findBestTimeShift, alignData, analyzeDrawdowns } = require('../analyzers/drawdownAnalyzer');
+const { findBestTimeShift, alignData, analyzeDrawdowns } = require('../analyzer/drawdownAnalyzer');
 
 router.get('/tokens', (req, res) => {
     res.json({ success: true, tokens: loadTokens() });
@@ -19,7 +19,11 @@ router.get('/chains', (req, res) => {
         { value: "evm:137", name: "Polygon", type: "evm" },
         { value: "evm:42161", name: "Arbitrum", type: "evm" },
         { value: "evm:10", name: "Optimism", type: "evm" },
-        { value: "evm:8453", name: "Base", type: "evm" }
+        { value: "evm:8453", name: "Base", type: "evm" },
+        { value: "evm:43114", name: "Avalanche", type: "evm" },
+        { value: "ton:ton", name: "TON", type: "ton" },
+        { value: "xrpl:xrpl", name: "XRPL", type: "xrpl" },
+        { value: "algorand:algorand", name: "Algorand", type: "algorand" }
     ];
     res.json({ success: true, chains });
 });
